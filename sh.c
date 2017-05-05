@@ -98,6 +98,13 @@ void runcmd(struct cmd *cmd) {
 			exit();
 		}
 		//关了，打开就行就行了？
+		/*A newly allocated file descriptor is al-
+		 ways the lowest-numbered unused descriptor of the current process.
+
+		 Fork copies the parent’s file descriptor table along with its memory, so that the child
+		 starts with exactly the same open files as the parent. The system call exec replaces the
+		 calling process’s memory but preserves its file table.
+		 */
 		runcmd(rcmd->cmd);
 		break;
 	case LIST:
@@ -110,7 +117,7 @@ void runcmd(struct cmd *cmd) {
 	case PIPE:
 
 		pcmd = (struct pipecmd*) cmd;
-		//p[0]读，p[1]写
+		//p[0]输入，p[1]输出
 		if (pipe(p) < 0)
 			panic("pipe");
 		if (fork1() == 0) {
@@ -413,33 +420,33 @@ struct cmd* nulterminate(struct cmd *cmd) {
 	struct listcmd *lcmd;
 	struct pipecmd *pcmd;
 	struct redircmd *rcmd;
-	if(cmd==0)
+	if (cmd == 0)
 		return 0;
-	switch(cmd->type){
+	switch (cmd->type) {
 	case EXEC:
-		ecmd=(struct execcmd*)cmd;
-		for(int i=0;ecmd->argv[i];i++)
-			*ecmd->eargv[i]=0;
+		ecmd = (struct execcmd*) cmd;
+		for (int i = 0; ecmd->argv[i]; i++)
+			*ecmd->eargv[i] = 0;
 		break;
 	case REDIR:
-		rcmd=(struct redircmd*)cmd;
+		rcmd = (struct redircmd*) cmd;
 		nulterminate(rcmd->cmd);
-		*rcmd->efile=0;
+		*rcmd->efile = 0;
 		break;
 	case PIPE:
-	    pcmd = (struct pipecmd*)cmd;
-	    nulterminate(pcmd->left);
-	    nulterminate(pcmd->right);
-	    break;
+		pcmd = (struct pipecmd*) cmd;
+		nulterminate(pcmd->left);
+		nulterminate(pcmd->right);
+		break;
 	case LIST:
-	    lcmd = (struct listcmd*)cmd;
-	    nulterminate(lcmd->left);
-	    nulterminate(lcmd->right);
-	    break;
+		lcmd = (struct listcmd*) cmd;
+		nulterminate(lcmd->left);
+		nulterminate(lcmd->right);
+		break;
 	case BACK:
-	    bcmd = (struct backcmd*)cmd;
-	    nulterminate(bcmd->cmd);
-	    break;
+		bcmd = (struct backcmd*) cmd;
+		nulterminate(bcmd->cmd);
+		break;
 	}
 	return cmd;
 }
