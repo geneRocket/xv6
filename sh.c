@@ -112,6 +112,7 @@ void runcmd(struct cmd *cmd) {
 		if (fork1() == 0)
 			runcmd(lcmd->left);
 		wait();
+		//Although fork copies the file descriptor table, each underlying file offset is shared between parent and child.
 		runcmd(lcmd->right);
 		break;
 	case PIPE:
@@ -125,6 +126,14 @@ void runcmd(struct cmd *cmd) {
 			dup(p[1]);
 			close(p[0]);
 			close(p[1]);
+			/*
+			 If no data is available,a read on a pipe waits for either data to be written or all
+			 file descriptors referring to the write end to be closed;
+			 The fact that read blocks
+			 until it is impossible for new data to arrive is one reason that it’s important for the
+			 child to close the write end of the pipe before executing wc above: if one of wc’s file
+			 descriptors referred to the write end of the pipe, wc would never see end-of-file
+			 */
 			runcmd(pcmd->left);
 		}
 		if (fork1() == 0) {
@@ -132,6 +141,7 @@ void runcmd(struct cmd *cmd) {
 			dup(p[0]);
 			close(p[0]);
 			close(p[1]);
+
 			runcmd(pcmd->right);
 		}
 		close(p[0]);
@@ -352,7 +362,8 @@ struct cmd* parsepipe(char **ps, char *es) {
 struct cmd*parseredirs(struct cmd *cmd, char **ps, char *es) {
 	int tok;
 	char *q, *eq;
-
+	/*mkdir creates a
+	 new directory, open with the O_CREATE flag creates a new data file*/
 	while (peek(ps, es, "<>")) {
 		tok = gettoken(ps, es, 0, 0);
 		if (gettoken(ps, es, &q, &eq) != 'a')
@@ -365,7 +376,7 @@ struct cmd*parseredirs(struct cmd *cmd, char **ps, char *es) {
 			cmd = redircmd(cmd, q, eq, O_WRONLY | O_CREATE, 1);
 			break;
 		case '+':
-			cmd = redircmd(cmd, q, eq, O_WRONLY, 1);
+			cmd = redircmd(cmd, q, eq, O_WRONLY | O_CREATE, 1);
 			break;
 		}
 	}
