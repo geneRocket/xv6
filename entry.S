@@ -8,6 +8,9 @@
 #include "mmu.h"
 #include "param.h"
 
+
+#此文件在逻辑高地址，物理低地址
+
 # By convention, the _start symbol specifies the ELF entry point.
 # Since we haven't set up virtual memory yet, our entry point is
 # the physical address of 'entry'.
@@ -29,13 +32,14 @@ entry:
 	movl %eax,%cr3
 
 	# Turn on paging
-
 	movl %cr0,%eax
 	orl     $(CR0_PG|CR0_WP), %eax
 	#orl     $(CR0_PG), %eax
 	#write protect
 	movl    %eax, %cr0
 
+	#All symbols have high addresses, including stack, so the stack will still be valid even
+	#when the low mappings are removed.
 	# Set up the stack pointer.
 	movl $(stack+KSTACKSIZE),%esp
 
