@@ -14,7 +14,7 @@ alltraps:
   movw $(SEG_KDATA<<3), %ax
   movw %ax, %ds
   movw %ax, %es
-  movw $(SEG_KCPU<<3), %ax//?????
+  movw $(SEG_KCPU<<3), %ax//every cpu SEG_KCPU segment desc is different
   movw %ax, %fs
   movw %ax, %gs
   # Call trap(tf), where tf=%esp
