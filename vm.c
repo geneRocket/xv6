@@ -10,6 +10,31 @@
 extern char data[]; // defined by kernel.ld 数据段
 pde_t * kpgdir; // for use in scheduler()
 
+// Set up CPU's kernel segment descriptors.
+// Run once on entry on each CPU.
+void seginit(void) {
+	struct cpu *c;
+	// Map "logical" addresses to virtual addresses using identity map.
+	// Cannot share a CODE descriptor for both kernel and user
+	// because it would have to have DPL_USR, but the CPU forbids
+	// an interrupt from CPL=0 to DPL=3.
+	c = &cpus[cpunum()];
+	c->gdt[SEG_KCODE] = SEG(STA_X|STA_R, 0, 0xffffffff, 0);
+	c->gdt[SEG_KDATA] = SEG(STA_W, 0, 0xffffffff, 0);
+	c->gdt[SEG_UCODE] = SEG(STA_X|STA_R, 0, 0xffffffff, DPL_USER);
+	c->gdt[SEG_UDATA] = SEG(STA_W, 0, 0xffffffff, DPL_USER);
+
+	// Map cpu and proc -- these are private per cpu.
+	c->gdt[SEG_KCPU] = SEG(STA_W, &c->cpu, 8, 0);
+
+	lgdt(c->gdt, sizeof(c->gdt));
+	loadgs(SEG_KCPU << 3);
+
+	// Initialize cpu-local storage.
+	cpu = c;
+	proc = 0;
+}
+
 // Return the address of the PTE in page table pgdir
 // that corresponds to virtual address va.  If alloc!=0,
 // create any required page table pages.
@@ -176,14 +201,13 @@ int allocuvm(pde_t *pgdir, uint oldsz, uint newsz) {
 		mem = kalloc();
 		if (mem == 0) {
 			cprintf("allocuvm out of memory\n");
-			deallocuvm(pgdir,newsz,oldsz);
+			deallocuvm(pgdir, newsz, oldsz);
 			return 0;
 		}
-		memset(mem,0,PGSIZE);
-		if(mappages(pgdir,(char*)a,PGSIZE,V2P(mem),PTE_W|PTE_U)<0)
-		{
+		memset(mem, 0, PGSIZE);
+		if (mappages(pgdir, (char*) a, PGSIZE, V2P(mem), PTE_W | PTE_U) < 0) {
 			cprintf("allocuvm out of memory (2)\n");
-			deallocuvm(pgdir,newsz,oldsz);
+			deallocuvm(pgdir, newsz, oldsz);
 			kfree(mem);
 			return 0;
 		}
@@ -207,34 +231,33 @@ int deallocuvm(pde_t *pgdir, uint oldsz, uint newsz) {
 		if (!pte)
 			a = PGADDR(PDX(a)+1,0,0) - PGSIZE;
 		else if ((*pte & PTE_P) != 0) {
-			pa=PTE_ADDR(*pte);
-			if(pa==0)
+			pa = PTE_ADDR(*pte);
+			if (pa == 0)
 				panic("kfree");
-			char *v=P2V(pa);
+			char *v = P2V(pa);
 			kfree(v);
-			*pte=0;
+			*pte = 0;
 		}
 	}
 }
 
 // Load a program segment into pgdir.  addr must be page-aligned
 // and the pages from addr to addr+sz must already be mapped.
-int loaduvm(pde_t *pgdir,char *addr,struct inode *ip,uint offset,uint sz)
-{
-	uint i,pa,n;
+int loaduvm(pde_t *pgdir, char *addr, struct inode *ip, uint offset, uint sz) {
+	uint i, pa, n;
 	pte_t *pte;
-	if((uint)addr%PGSIZE!=0)
+	if ((uint) addr % PGSIZE != 0)
 		panic("loaduvm: addr must be page aligned");
-	for(i=0;i<sz;i+=PGSIZE)
+	for (i = 0; i < sz; i += PGSIZE)
 	{
-		if((pte=walkpgdir(pgdir,addr+i,0))==0)
+		if ((pte = walkpgdir(pgdir, addr + i, 0)) == 0)
 			panic("loaduvm: address should exist");
-		pa=PTE_ADDR(*pte);
-		if(sz-i<PGSIZE)
-			n=sz-i;
+		pa = PTE_ADDR(*pte);
+		if (sz - i < PGSIZE)
+			n = sz - i;
 		else
-			n=PGSIZE;
-		if(readi(ip,P2V(pa),offset+i,n)!=n)
+			n = PGSIZE;
+		if (readi(ip, P2V(pa), offset + i, n) != n)
 			return -1;
 	}
 	return 0;
@@ -242,31 +265,27 @@ int loaduvm(pde_t *pgdir,char *addr,struct inode *ip,uint offset,uint sz)
 
 // Free a page table and all the physical memory pages
 // in the user part.
-void freevm(pde_t *pgdir)
-{
+void freevm(pde_t *pgdir) {
 	uint i;
 
-	if(pgdir==0)
+	if (pgdir == 0)
 		panic("freevm: no pgdir");
-	deallocuvm(pgdir,KERNBASE,0);
-	for(i=0;i<NPDENTRIES;i++)
-	{
-		if(pgdir[i]&PTE_P)
-		{
-			char *v=P2V(PTE_ADDR(pgdir[i]));
+	deallocuvm(pgdir, KERNBASE, 0);
+	for (i = 0; i < NPDENTRIES; i++) {
+		if (pgdir[i] & PTE_P) {
+			char *v = P2V(PTE_ADDR(pgdir[i]));
 			kfree(v);
 		}
 	}
-	kfree((char*)pgdir);
+	kfree((char*) pgdir);
 }
 
 // Clear PTE_U on a page. Used to create an inaccessible
 // page beneath the user stack.
-void clearpteu(pde_t *pgdir,char *uva)
-{
+void clearpteu(pde_t *pgdir, char *uva) {
 	pte_t *pte;
-	pte=walkpgdir(pgdir,uva,0);
-	if(pte==0)
+	pte = walkpgdir(pgdir, uva, 0);
+	if (pte == 0)
 		panic("clearpteu");
 	*pte &= ~PTE_U;
 }
@@ -280,7 +299,7 @@ char *uva2ka(pde_t *pgdir, char *uva) {
 		return 0;
 	if ((*pte & PTE_U) == 0)
 		return 0;
-	return (char*)P2V(PTE_ADDR(*pte));
+	return (char*) P2V(PTE_ADDR(*pte));
 }
 
 // Copy len bytes from p to user address va in page table pgdir.

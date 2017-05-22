@@ -129,15 +129,94 @@ void scheduler(void) {
 			proc = p;
 			switchuvm(p);//tell the hardware to start using the target process’s page table
 			p->state = RUNNING;
-			swtch(&cpu->scheduler, p->context);//set esp
+			swtch(&cpu->scheduler, p->context);			//set esp
 			switchkvm();
 
 			// Process is done running for now.
 			// It should have changed its p->state before coming back.
-			proc=0;
+			proc = 0;
 		}
 		release(&ptable.lock);
 	}
 }
 
+// Enter scheduler.  Must hold only ptable.lock
+// and have changed proc->state. Saves and restores
+// intena because intena is a property of this
+// kernel thread, not this CPU. It should
+// be proc->intena and proc->ncli, but that would
+// break in the few places where a lock is held but
+// there's no process.
+void sched(void) {
+	int intena;
 
+	if (!hoding(&ptable.lock))
+		panic("sched ptable.lock");
+	if (cpu->ncli != 1)	//since a lock is held, the CPU should be running with interrupts disabled.
+		panic("sched locks");
+	if (proc->state == RUNNING)
+		panic("sched running");
+	if (readflags() & FL_IF)
+		panic("sched interruptible");
+	intena = cpu->intena;
+	swtch(&proc->context, cpu->scheduler);
+	cpu->intena = intena;
+}
+
+// Give up the CPU for one scheduling round.
+void yield(void) {
+	acquire(&ptable.lock);
+	proc->state = RUNNABLE;
+	sched();
+	/*the caller of
+	 swtch must already hold the lock, and control of the lock passes to the switched-to
+	 code.*/
+	release(&ptable.lock);
+}
+
+// Atomically release lock and sleep on chan.
+// Reacquires lock when awakened.
+void sleep(void *chan, struct spinlock *lk) {
+	if (proc == 0)
+		panic("sleep");
+	if (lk == 0)
+		panic("sleep without lk");
+	// Must acquire ptable.lock in order to
+	// change p->state and then call sched.
+	// Once we hold ptable.lock, we can be
+	// guaranteed that we won't miss any wakeup
+	// (wakeup runs with ptable.lock locked),
+	// so it's okay to release lk.
+	if (lk != &ptable.lock) {
+		acquire(&ptable.lock);
+		release(lk);
+	}
+	// Go to sleep.
+	proc->chan = chan;
+	proc->state = SLEEPING;
+	sched();
+	// Tidy up.
+	proc->chan = 0;
+
+	// Reacquire original lock.
+	if (lk != &ptable.lock) {
+		release(&ptable.lock);
+		acquire(lk);
+	}
+}
+
+// Wake up all processes sleeping on chan.
+// The ptable lock must be held.
+static void wakeup1(void *chan) {
+	struct proc *p;
+	for (p = ptable.proc; p < &ptable[NPROC]; p++)
+		if (p->state == SLEEPING && p->chan == chan)
+			p->state = RUNNABLE;
+}
+
+// Wake up all processes sleeping on chan.
+void wakeup(void *chan) {
+	acquire(&ptable.lock);
+	wakeup1(chan);
+	release(&ptable.lock);
+}
