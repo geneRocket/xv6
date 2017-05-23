@@ -160,7 +160,7 @@ void sched(void) {
 		panic("sched interruptible");
 	intena = cpu->intena;
 	swtch(&proc->context, cpu->scheduler);
-	cpu->intena = intena;
+	cpu->intena = intena;	//belong to a process attribute
 }
 
 // Give up the CPU for one scheduling round.
@@ -219,4 +219,108 @@ void wakeup(void *chan) {
 	acquire(&ptable.lock);
 	wakeup1(chan);
 	release(&ptable.lock);
+}
+
+// Wait for a child process to exit and return its pid.
+// Return -1 if this process has no children.
+int wait(void) {
+	struct proc *p;
+	int havekids, pid;
+
+	acquire(&ptable.lock);
+	for (;;) {
+		// Scan through table looking for exited children.
+		havekids = 0;
+		for (p = ptable.proc; p < &ptable[NPROC]; p++) {
+			if (p->parent != proc)
+				continue;
+			havekids = 1;
+			if (p->state == ZOMBIE) {
+				//found one.
+				pid = p->pid;
+				kfree(p->kstack);
+				p->kstack = 0;
+				freevm(p->pgdir);
+				p->pid = 0;
+				p->parent = 0;
+				p->name[0] = 0;
+				p->killed = 0;
+				p->state = UNUSED;
+				release(&ptable.lock);
+				return pid;
+			}
+		}
+		// No point waiting if we don't have any children.
+		if (!havekids || proc->killed) {
+			release(&ptable.lock);
+			return -1;
+		}
+
+		// Wait for children to exit.  (See wakeup1 call in proc_exit.)
+		sleep(proc, &ptable.lock);
+	}
+}
+
+// Exit the current process.  Does not return.
+// An exited process remains in the zombie state
+// until its parent calls wait() to find out it exited.
+void exit(void) {
+	struct proc *p;
+	int fd;
+	if (proc == initproc)
+		panic("init exiting");
+	//close all open files
+	for (fd = 0; fd < NOFILE; fd++) {
+		if (proc->ofile[fd]) {
+			fileclose(proc->ofile[fd]);
+			proc->ofile[fd] = 0;
+		}
+	}
+	begin_op();
+	iput(proc->cwd);
+	end_op();
+	proc->cwd = 0;
+
+	acquire(&ptable.lock);
+	// Parent might be sleeping in wait().
+	wakeup1(proc->parent);
+
+	// Pass abandoned children to init.
+	for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
+		if (p->parent == proc) {
+			p->parent = initproc;
+			if (p->state == ZOMBIE) {
+				wakeup1(initproc);
+			}
+		}
+	}
+
+	// Jump into the scheduler, never to return.
+	proc->state = ZOMBIE;
+	sched();
+	panic("zombie exit");
+}
+
+// Kill the process with the given pid.
+// Process won't exit until it returns
+// to user space (see trap in trap.c).
+int kill(int pid)
+{
+	struct proc *p;
+
+	acquire(&ptable.lock);
+	for(p=ptable.proc;p<&ptable.proc[NPROC];p++)
+	{
+		if(p->pid==pid)
+		{
+			p->killed=1;
+		      // Wake process from sleep if necessary.
+			if(p->state==SLEEPING)
+				p->state=RUNNABLE;
+			release(&ptable.lock);
+			return 0;
+		}
+	}
+	release(&ptable.lock);
+	return -1;
 }
