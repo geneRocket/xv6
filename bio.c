@@ -94,3 +94,35 @@ struct buf* bread(uint dev, uint blockno) {
 	}
 	return b;
 }
+
+// Write b's contents to disk.  Must be locked.
+void bwrite(struct buf *b) {
+	if (!hodingsleep(&b->lock))
+		panic("bwrite");
+	b->flags |= B_DIRTY;
+	iderw(b);
+}
+
+// Release a locked buffer.
+// Move to the head of the MRU list.
+void brelse(struct buf *b) {
+	if (!hodingsleep(&b->lock))
+		panic("brelse");
+	releasesleep(&b->lock);
+
+	acquire(&bcache.lock);
+	b->refcnt--;
+	if (b->refcnt == 0) {
+		//no one is waiting for it;
+		//insert to the next of bcache.head
+		b->next->prev = b->prev;
+		b->prev->next = b->next;
+
+		b->next = bcache.head.next;
+		b->prev = &bcache.head;
+
+		bcache.head.next->prev=b;
+		bcache.head.next=b;
+	}
+	release(&bcache.lock);
+}
