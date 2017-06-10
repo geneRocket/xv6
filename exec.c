@@ -39,7 +39,7 @@ int exec(char *path, char **argv) {
 			goto bad;
 		if (ph.type != ELF_PROG_LOAD)
 			continue;
-		if (ph.memsz < filesz)
+		if (ph.memsz < ph.filesz)
 			goto bad;
 		if (ph.vaddr + ph.memsz < ph.vaddr)
 			goto bad;
@@ -85,7 +85,7 @@ int exec(char *path, char **argv) {
 			last = s + 1;
 	safestrcpy(proc->name, last, sizeof(proc->name));
 	// Commit to the user image.
-	oldpgdir = porc->pgdir;
+	oldpgdir = proc->pgdir;
 	proc->pgdir = pgdir;
 	proc->sz = sz;
 	proc->tf->eip = elf.entry;
