@@ -96,7 +96,7 @@ int piperead(struct pipe *p, char *addr, int n) {
 	while (p->nread == p->nwrite && p->writeopen) //pipe-empty
 	{
 		if (proc->killed) {
-			realease(&p->lock);
+			release(&p->lock);
 			return -1;
 		}
 		sleep(&p->nread, &p->lock); //piperead-sleep

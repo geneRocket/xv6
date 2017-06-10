@@ -126,7 +126,7 @@ void iderw(struct buf *b)
 {
 	struct buf **pp;
 
-	if(!hodingsleep(&b->lock))
+	if(!holdingsleep(&b->lock))
 		panic("iderw:buf not locked");
 	if((b->flags & (B_VALID|B_DIRTY))==B_VALID)
 		panic("iderw: nothing to do");

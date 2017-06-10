@@ -26,7 +26,7 @@ struct ioapic {
 	uint data;
 };
 
-static uint ioapicred(int reg) {
+static uint ioapicread(int reg) {
 	ioapic->reg = reg;
 	return ioapic->data;
 }

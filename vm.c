@@ -239,6 +239,7 @@ int deallocuvm(pde_t *pgdir, uint oldsz, uint newsz) {
 			*pte = 0;
 		}
 	}
+	return newsz;
 }
 
 // Load a program segment into pgdir.  addr must be page-aligned
@@ -333,7 +334,7 @@ pde_t *copyuvm(pde_t *pgdir, uint sz) {
 	uint pa, i, flags;
 	char *mem;
 
-	if ((d = setupkvm() == 0))
+	if ((d = setupkvm()) == 0)
 		return 0;
 	for (i = 0; i < sz; i += PGSIZE) {
 		if ((pte = walkpgdir(pgdir, (void*) i, 0)) == 0)

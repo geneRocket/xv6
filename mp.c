@@ -89,7 +89,7 @@ void mpinit(void) {
 	struct mpproc *proc;
 	struct mpioapic *ioapic;
 
-	if ((conf = mpconfig & mp) == 0)
+	if ((conf = mpconfig(&mp)) == 0)
 		return;
 	ismp = 1;
 	lapic = (uint*) conf->lapicaddr;
@@ -103,20 +103,20 @@ void mpinit(void) {
 			}
 			p += sizeof(struct mpproc);
 			continue;
-		}
 		case MPIOAPIC:
-		ioapic = (struct mpioapic*) p;
-		ioapicid = ioapic->apicno;
-		p += sizeof(struct mpioapic);
-		continue;
+			ioapic = (struct mpioapic*) p;
+			ioapicid = ioapic->apicno;
+			p += sizeof(struct mpioapic);
+			continue;
 		case MPBUS:
 		case MPIOINTR:
 		case MPLINTR:
-		p += 8;
-		continue;
+			p += 8;
+			continue;
 		default:
-		ismp = 0;
-		break;
+			ismp = 0;
+			break;
+		}
 	}
 	if (!ismp) {
 		// Didn't like what we found; fall back to no MP.

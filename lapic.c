@@ -52,7 +52,7 @@ void lapicinit(void) {
 		return;
 
 	// Enable local APIC; set spurious interrupt vector.
-	lapicw(SVR, ENABLE | T_IRQ0 + IRQ_SPURIOUS);
+	lapicw(SVR, ENABLE | (T_IRQ0 + IRQ_SPURIOUS));
 
 	// The timer repeatedly counts down at bus frequency
 	// from lapic[TICR] and then issues an interrupt.
@@ -97,7 +97,7 @@ int cpunum(void) {
 	// Would prefer to panic but even printing is chancy here:
 	// almost everything, including cprintf and panic, calls cpu,
 	// often indirectly through acquire and release.
-	if (readflags() & FL_IF) {
+	if (readeflags() & FL_IF) {
 		static int n;
 		if (n++ == 0)
 			cprintf("cpu called from %x with interrupts enabled\n",
@@ -193,15 +193,15 @@ void cmostime(struct rtcdate *r) {
 	struct rtcdate t1, t2;
 
 	int sb, bcd;
-
+	sb = cmos_read(CMOS_STATB);
 	bcd = (sb & (1 << 2)) == 0;
 
 	// make sure CMOS doesn't modify time while we read it
 	for (;;) {
-		fill_rtdcdate(&t1);
+		fill_rtcdate(&t1);
 		if (cmos_read(CMOS_STATA) & CMOS_UIP)
 			continue;
-		fill_rtdcdate(&t2);
+		fill_rtcdate(&t2);
 		if (memcmp(&t1, &t2, sizeof(t1)) == 0)
 			break;
 	}

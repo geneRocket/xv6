@@ -36,7 +36,7 @@ void releasesleep(struct sleeplock *lk)
 	release(&lk->lk);
 }
 
-int hodingsleep(struct sleeplock *lk)
+int holdingsleep(struct sleeplock *lk)
 {
 	int r;
 	acquire(&lk->lk);

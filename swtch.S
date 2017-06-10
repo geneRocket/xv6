@@ -7,8 +7,8 @@
 .globl swtch
 swtch:
 	//must do this before it changes the stack pointer and can no longer access the arguments via %esp
-	movl $4(%esp),%eax
-	movl $8(%esp),%edx
+	movl 4(%esp),%eax
+	movl 8(%esp),%edx
 	//scheduler
 	# Save old callee-save registers
 	pushl %ebp

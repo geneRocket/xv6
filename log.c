@@ -94,7 +94,7 @@ static void read_head() {
 static void write_head(void) {
 	struct buf *buf = bread(log.dev, log.start);
 	struct logheader *hb = (struct logheader *) (buf->data);
-	int i;
+
 	hb->n = log.lh.n;
 	for (int i = 0; i < log.lh.n; i++) {
 		hb->block[i] = log.lh.block[i];

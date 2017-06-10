@@ -35,7 +35,7 @@ static struct proc*allocproc(void) {
 
 	acquire(&ptable.lock);
 
-	for (p = ptable.proc; p < &ptable[NPROC]; p++)
+	for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
 		if (p->state == UNUSED)
 			goto found;
 
@@ -87,8 +87,8 @@ void userinit(void) {
 	p->tf->esp = PGSIZE;//user stack,inituvm malloc a page,largest valid virtual address
 	p->tf->eip = 0;	// beginning of initcode.S
 
-	safectrcpy(p->name, "initcode", sizeof(p->name));
-	p->cwd = name("/");
+	safestrcpy(p->name, "initcode", sizeof(p->name));
+	p->cwd = namei("/");
 
 	// this assignment to p->state lets other cores
 	// run this process. the acquire forces the above
@@ -162,13 +162,13 @@ void scheduler(void) {
 void sched(void) {
 	int intena;
 
-	if (!hoding(&ptable.lock))
+	if (!holding(&ptable.lock))
 		panic("sched ptable.lock");
 	if (cpu->ncli != 1)	//since a lock is held, the CPU should be running with interrupts disabled.
 		panic("sched locks");
 	if (proc->state == RUNNING)
 		panic("sched running");
-	if (readflags() & FL_IF)
+	if (readeflags() & FL_IF)
 		panic("sched interruptible");
 	intena = cpu->intena;
 	swtch(&proc->context, cpu->scheduler);
@@ -221,7 +221,7 @@ void sleep(void *chan, struct spinlock *lk) {
 // The ptable lock must be held.
 static void wakeup1(void *chan) {
 	struct proc *p;
-	for (p = ptable.proc; p < &ptable[NPROC]; p++)
+	for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
 		if (p->state == SLEEPING && p->chan == chan)
 			p->state = RUNNABLE;
 }
@@ -243,7 +243,7 @@ int wait(void) {
 	for (;;) {
 		// Scan through table looking for exited children.
 		havekids = 0;
-		for (p = ptable.proc; p < &ptable[NPROC]; p++) {
+		for (p = ptable.proc; p < &ptable.proc[NPROC]; p++) {
 			if (p->parent != proc)
 				continue;
 			havekids = 1;
@@ -342,7 +342,7 @@ int growproc(int n) {
 	sz = proc->sz;
 
 	if (n > 0) {
-		if ((sz = allocuvm(proc.pgdir, sz, sz + n)) == 0)
+		if ((sz = allocuvm(proc->pgdir, sz, sz + n)) == 0)
 			return -1;
 	} else if (n < 0)
 		if ((sz = deallocuvm(proc->pgdir, sz, sz + n)) == 0)

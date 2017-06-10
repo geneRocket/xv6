@@ -279,7 +279,7 @@ void ilock(struct inode *ip) {
 
 // Unlock the given inode.
 void iunlock(struct inode *ip) {
-	if (ip == 0 || !hodingsleep(&ip->lock) || ip->ref < 1)
+	if (ip == 0 || !holdingsleep(&ip->lock) || ip->ref < 1)
 		panic("iunlock");
 
 	releasesleep(&ip->lock);
@@ -372,7 +372,7 @@ static uint bmap(struct inode *ip, uint bn) {
 	struct buf *bp;
 
 	if (bn < NDIRECT) {
-		if ((addr = ip.addrs[bn]) == 0)
+		if ((addr = ip->addrs[bn]) == 0)
 			ip->addrs[bn] = addr = balloc(ip->dev);
 		return addr;
 	}
@@ -382,7 +382,7 @@ static uint bmap(struct inode *ip, uint bn) {
 		if ((addr = ip->addrs[NDIRECT]) == 0)
 			ip->addrs[NDIRECT] = addr = balloc(ip->dev);
 		bp = bread(ip->dev, addr);
-		a = (uint *) bp - data;
+		a = (uint *) bp->data;
 		if ((addr = a[bn]) == 0) {
 			a[bn] = addr = balloc(ip->dev);
 			log_write(bp);

@@ -71,7 +71,7 @@ static struct buf* bget(uint dev, uint blockno) {
 	// Not cached; recycle some unused buffer and clean buffer
 	// "clean" because B_DIRTY and not locked means log.c
 	// hasn't yet committed the changes to the buffer.
-	for (b = bcache.head.prev; b != bcache.head; b = b->prev) {
+	for (b = bcache.head.prev; b != &bcache.head; b = b->prev) {
 		if (b->refcnt == 0 && (b->flags & B_DIRTY) == 0) {
 			b->dev = dev;
 			b->blockno = blockno;
@@ -97,7 +97,7 @@ struct buf* bread(uint dev, uint blockno) {
 
 // Write b's contents to disk.  Must be locked.
 void bwrite(struct buf *b) {
-	if (!hodingsleep(&b->lock))
+	if (!holdingsleep(&b->lock))
 		panic("bwrite");
 	b->flags |= B_DIRTY;
 	iderw(b);
@@ -106,7 +106,7 @@ void bwrite(struct buf *b) {
 // Release a locked buffer.
 // Move to the head of the MRU list.
 void brelse(struct buf *b) {
-	if (!hodingsleep(&b->lock))
+	if (!holdingsleep(&b->lock))
 		panic("brelse");
 	releasesleep(&b->lock);
 

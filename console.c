@@ -57,7 +57,7 @@ void cprintf(char *fmt, ...) {
 		acquire(&cons.lock);
 
 	if (fmt == 0)
-		painic("null fmt");
+		panic("null fmt");
 
 	argp = (uint *) (void*) (&fmt + 1);
 	for (i = 0; (c = fmt[i] & 0xff) != 0; i++) {
@@ -83,11 +83,11 @@ void cprintf(char *fmt, ...) {
 				consputc(*s);
 			break;
 		case '%':
-			constputc('%');
+			consputc('%');
 			break;
 		default:
 			// Print unknown % sequence to draw attention.
-			constputc('%');
+			consputc('%');
 			consputc(c);
 			break;
 		}
@@ -97,7 +97,7 @@ void cprintf(char *fmt, ...) {
 		release(&cons.lock);
 }
 
-void painic(char *s) {
+void panic(char *s) {
 	int i;
 	uint pcs[10];
 
@@ -262,7 +262,7 @@ int consolewrite(struct inode *ip,char *buf,int n)
 	iunlock(ip);
 	acquire(&cons.lock);
 	for(i=0;i<n;i++)
-		consputc(buf[i],&0xff);
+		consputc(buf[i]&0xff);
 	release(&cons.lock);
 	ilock(ip);
 	return n;
