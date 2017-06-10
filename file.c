@@ -37,7 +37,7 @@ struct file* filealloc() {
 }
 
 // Increment ref count for file f.
-struct file *fileup(struct file *f) {
+struct file *filedup(struct file *f) {
 	acquire(&ftable.lock);
 	if (f->ref < 1)
 		panic("fileup");

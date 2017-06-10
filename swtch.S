@@ -3,7 +3,7 @@
 # Save current register context in old
 # and then load register context from new.
 
-
+//change eip and esp
 .globl swtch
 swtch:
 	//must do this before it changes the stack pointer and can no longer access the arguments via %esp
