@@ -37,7 +37,7 @@ static void idestart(struct buf*);
 static int idewait(int checkerr) {
 	int r;
 
-	while (((r = inb(0x1f7)) & (IDE_BSY | IDE_ERR)))
+	while (((r = inb(0x1f7)) & (IDE_BSY | IDE_DRDY))!=IDE_DRDY)
 		continue;
 	if (checkerr && (r & (IDE_DF | IDE_ERR)) != 0)
 		return -1;
@@ -103,7 +103,8 @@ void ideintr() {
 		// cprintf("spurious IDE interrupt\n");
 		return;
 	}
-	idequeue = b->next;
+	idequeue = b->qnext;
+
 	// Read data if needed.
 	if (!(b->flags & B_DIRTY) && idewait(1) >= 0)
 		insl(0x1f0, b->data, BSIZE / 4);
