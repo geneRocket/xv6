@@ -70,8 +70,9 @@ void pipeclose(struct pipe *p, int writable) {
 }
 
 int pipewrite(struct pipe *p, char *addr, int n) {
+	int i;
 	acquire(&p->lock);
-	for (int i = 0; i < n; i++) {
+	for (i = 0; i < n; i++) {
 		while (p->nwrite == p->nread + PIPESIZE) //pipewrite-full
 		{
 			if (p->readopen == 0 || proc->killed) //if no check readopen,may sleep forever
@@ -101,7 +102,7 @@ int piperead(struct pipe *p, char *addr, int n) {
 		}
 		sleep(&p->nread, &p->lock); //piperead-sleep
 	}
-	for (int i = 0; i < n; i++) { //piperead-copy
+	for (i = 0; i < n; i++) { //piperead-copy
 		if (p->nread == p->nwrite)
 			break;
 		addr[i] = p->data[p->nread++ % PIPESIZE];
