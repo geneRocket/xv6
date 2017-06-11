@@ -108,7 +108,7 @@ int cpunum(void) {
 		return 0;
 	apicid = lapic[ID] >> 24;
 	for (i = 0; i < ncpu; i++) {
-		if (cpu[i].apicid == apicid)
+		if (cpus[i].apicid == apicid)
 			return i;
 	}
 	panic("unknown apicid\n");
