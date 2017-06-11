@@ -448,6 +448,7 @@ int writei(struct inode *ip, char *src, uint off, uint n) {
 		bp = bread(ip->dev, bmap(ip, off / BSIZE));
 		m = min(n - tot, BSIZE-off%BSIZE);
 		memmove(bp->data + off % BSIZE, src, m);
+		log_write(bp);
 		brelse(bp);
 	}
 	if (n > 0 && off > ip->size) {
@@ -572,7 +573,7 @@ static struct inode* namex(char *path,int nameiparent,char *name)
 	{
 		ilock(ip);
 		if(ip->type!=T_DIR){
-			iunlock(ip);
+			iunlockput(ip);
 			return 0;
 		}
 		if(nameiparent && *path=='\0'){
