@@ -182,7 +182,7 @@ int sys_unlink() {
 		dp->nlink--;
 		iupdate(dp);
 	}
-	iunlock(dp);
+	iunlockput(dp);
 
 	ip->nlink--;
 	iupdate(ip);
@@ -225,7 +225,7 @@ static struct inode* create(char *path, short type, short major, short minor) {
 		dp->nlink++; //for ".."
 		iupdate(dp);
 		// No ip->nlink++ for ".": avoid cyclic ref count.
-		if (dirlink(ip, ".an", ip->inum) < 0 || dirlink(ip, "..", dp->inum) < 0)
+		if (dirlink(ip, ".", ip->inum) < 0 || dirlink(ip, "..", dp->inum) < 0)
 			panic("create dots");
 	}
 	if (dirlink(dp, name, ip->inum) < 0)

@@ -51,7 +51,6 @@ void fileclose(struct file *f) {
 	struct file ff;
 
 	acquire(&ftable.lock);
-
 	if (f->ref < 1)
 		panic("fileclose");
 	if (--f->ref > 0) {
@@ -94,7 +93,7 @@ int fileread(struct file *f, char *addr, int n) {
 	if (f->type == FD_INODE) {
 		ilock(f->ip);
 		if ((r = readi(f->ip, addr, f->off, n)) > 0)
-			f->off += n;
+			f->off += r; //+r not n,r may smaller than n
 		iunlock(f->ip);
 		return r;
 	}
@@ -104,6 +103,7 @@ int fileread(struct file *f, char *addr, int n) {
 // Write to file f.
 int filewrite(struct file *f, char *addr, int n) {
 	int r;
+
 	if (f->writable == 0)
 		return -1;
 	if (f->type == FD_PIPE)
@@ -115,27 +115,26 @@ int filewrite(struct file *f, char *addr, int n) {
 		// and 2 blocks of slop for non-aligned writes.
 		// this really belongs lower down, since writei()
 		// might be writing a device like the console.
-		int max=((LOGSIZE-1-1-2)/2)*512;
-		int i=0;
-		while(i<n)
-		{
-			int n1=n-i;
-			if(n1>max)
-				n1=max;
+		int max = ((LOGSIZE - 1 - 1 - 2) / 2) * 512;
+		int i = 0;
+		while (i < n) {
+			int n1 = n - i;
+			if (n1 > max)
+				n1 = max;
 			begin_op();
 			ilock(f->ip);
-			if((r=writei(f->ip,addr+i,f->off,n1))>0)
-				f->off+=r;
+			if ((r = writei(f->ip, addr + i, f->off, n1)) > 0)
+				f->off += r;
 			iunlock(f->ip);
 			end_op();
 
-			if(r<0)
+			if (r < 0)
 				break;
-			if(r!=n1)
-				panic("short filewirte");
-			i+=r;
+			if (r != n1)
+				panic("short filewrite");
+			i += r;
 		}
-		return i==n?n:-1;
+		return i == n ? n : -1;
 	}
 	panic("filewrite");
 }

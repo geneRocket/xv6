@@ -40,7 +40,7 @@ static struct proc*allocproc(void) {
 			goto found;
 
 	release(&ptable.lock);
-
+	return 0;
 	found: p->state = EMBRYO;
 	p->pid = nextpid++;
 	release(&ptable.lock);
